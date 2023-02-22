@@ -23,8 +23,10 @@ function Get-UserInfo{
   param($Name)
     if($Name -eq "*"){
         $User = Get-ADUser -Filter * -properties *
-    }else{
+    }elseif($Name){
         $User = Get-ADUser $Name -properties *
+    }else{
+        $User = Get-ADUser -Filter * -properties *
     }
     foreach($x in $User){
         $MemberOf = (Get-ADUser $x -Properties *).MemberOf | %{ ($_ -split "," -like "CN=*" -split "=")[1]}
@@ -46,6 +48,62 @@ function Get-UserInfo{
             MemberOf    = $MemberOf
           })
         $UserInfo
+    }
+}
+
+<#
+ .Synopsis
+  Cmdlet for gathering AD Organizational Unit information.
+
+ .Description
+  Get-OUInfo lists important information about Active Directory Organizational Units. Includes linked Users, Groups, Computers, and Group Policy Objects. 
+
+ .Parameter Name
+  Name of an Organizational Unit.
+
+ .Example 
+   # List information about an orgnaizational unit
+   Get-OUInfo -Name Test-OU
+
+ .Example
+   # List information about all organizational units
+   Get-OUInfo -Name *
+
+ .Example
+   # List all users in an orgainzational unit
+   Get-OUInfo -Name Test-OU | Select -ExpandProperty Users
+
+ .Link
+   
+#>
+function Get-OUInfo{
+    param($Name)
+    $ErrorActionPreference = "SilentlyContinue"
+    if($Name -eq "*"){
+        $OU = Get-ADOrganizationalUnit -filter * -properties *
+        }elseif($Name){
+            $OU = Get-ADOrganizationalUnit -filter 'Name -like $Name' -properties *
+        }else{
+            $OU = Get-ADOrganizationalUnit -filter * -properties *
+        }
+    foreach($x in $OU){
+        $Users = Get-ADUser -filter * -SearchBase $x.DistinguishedName
+        $Computers = Get-ADComputer -filter * -SearchBase $x.DistinguishedName
+        $Groups = Get-ADGroup -filter * -SearchBase $x.DistinguishedName
+        $OUInfo = New-Object PSObject -Property $([ordered]@{
+            Name        = $x.Name
+            CN          = $x.CanonicalName
+            DN          = $x.DistinguishedName
+            ManagedBy   = $x.ManagedBy
+            Created     = $x.Created
+            Changed     = $x.WhenChanged
+            Description = $x.Description
+            GPO         = $x.LinkedGroupPolicyObjects
+            Users       = $Users
+            Groups      = $Groups
+            Computers   = $Computers
+            })
+        $OUInfo
     }
 }
 
@@ -74,8 +132,10 @@ function Get-GroupInfo{
     param($Name)
     if($Name -eq "*"){
         $Group = Get-AdGroup -Filter * -Properties *
-    }else{
+    }elseif($Name){
         $Group = Get-ADGroup "$Name" -Properties *
+    }else{
+        $Group = Get-AdGroup -Filter * -Properties *
     }
     foreach($x in $Group){
         $GroupMembers = Get-ADGroupMember $x.Name | % SamAccountName
@@ -120,8 +180,10 @@ function Get-ADComputerInfo{
     $ErrorActionPreference = 'SilentlyContinue'
     if($Name -eq "*"){
         $Computer = Get-ADComputer -filter * -properties *
-        }else{
+        }elseif($Name){
             $Computer = Get-ADComputer -Identity $Name -properties *
+        }else{
+            $Computer = Get-ADComputer -filter * -properties *
         }
     foreach($x in $Computer){
         Try{
